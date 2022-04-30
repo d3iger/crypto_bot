@@ -1,4 +1,5 @@
 from itertools import count
+from random import random
 import string
 import requests
 import config
@@ -7,6 +8,7 @@ from sqlite import sqlight
 from bs4 import BeautifulSoup
 import schedule
 import time
+import asyncio
 
 url = 'https://coinmarketcap.com/'
 
@@ -37,11 +39,11 @@ def get_url(html, url_mn):
     links1 = soup.find_all('tr', class_='sc-1rqmhtg-0 jUUSMS')
     links2 = soup.find_all('div', class_='sc-16r8icm-0 escjiH')
     url_list = []
-    for item in links1:
+    for item in links2:
         url2 = item.find('a', class_='cmc-link')['href']
         final_url = url_mn + url2
         url_list.append(final_url)
-    for item in links2:
+    for item in links1:
         url2 = item.find('a', class_='cmc-link')['href']
         final_url = url_mn + url2
         url_list.append(final_url)
@@ -49,29 +51,34 @@ def get_url(html, url_mn):
 ## This function just locates every variable
 def get_content(list):
     coins = []
-    for link in list:
+    for link in list[:5]:
+        time.sleep(2)
         html = get_html_for_url(link)
         soup = BeautifulSoup(html, 'html.parser')
-        price = soup.find('div', class_='sc-16r8icm-0 kjciSH priceTitle').find('span').get_text()
+        if soup.find('div', class_='sc-16r8icm-0 kjciSH priceTitle').find('span').get_text() != None:
+            price = soup.find('div', class_='sc-16r8icm-0 kjciSH priceTitle').find('span').get_text()
         ticket = soup.find('small', class_='nameSymbol').get_text()
-        coin_name = soup.find('h2', class_='sc-1q9q90x-0 jCInrl h1').get_text().replace(ticket, '')
+        coin_name = soup.find('h2', class_='sc-1q9q90x-0 jCInrl h1').get_text().replace(ticket, '', 1)
         percent = soup.find('div', class_='sc-16r8icm-0 kjciSH priceTitle').get_text().replace(price, '')
         print(coin_name)
         arrow1 = soup.find('span', class_='sc-15yy2pl-0 gEePkg')
         plus = ''
         if arrow1 == None:
             arrow = soup.find('span', class_='sc-15yy2pl-0 feeyND').find('span').get('class')
-            if arrow[0] == 'icon-Caret-up':
+            if arrow[0] == 'icon-Caret-up' and percent != '0.00%':
                 plus = '+'
-            else:
+            elif arrow[0] == 'icon-Caret-down' and percent != '0.00%':
                 plus = '-'
-
+            else:
+                plus = '='
         else:
             arrow = soup.find('span', class_='sc-15yy2pl-0 gEePkg').find('span').get('class')
-            if arrow[0] == 'icon-Caret-up':
+            if arrow[0] == 'icon-Caret-up' and percent != '0.00%':
                 plus = '+'
-            else:
+            elif arrow[0] == 'icon-Caret-down' and percent != '0.00%':
                 plus = '-'
+            else:
+                plus = '='
         
         coins.append({
             'name': coin_name,
@@ -84,28 +91,20 @@ def get_content(list):
     return coins
 
 
-def parse():
-    db.delete()
-    html = get_html(url)
-    if html.status_code == 200:
-        coins = []
-        pages_count = get_pages_count(html.text)
-        for page in range(pages_count):
+async def parse_every():
+    while True:
+        html = get_html(url)
+        if html.status_code == 200:
+            coins = []
+            await asyncio.sleep(1)
             print("Parse")
-            html = get_html(url, params={'page': page})
             coins = get_content(get_url(html.text, url))
-            print(coins)
-            print(coins[0])
-            print(coins[0]['name'])
             for i in range(len(coins)):
                 if not db.get_price(coins[i]['name']):
                     db.save_file(coins[i]['name'], coins[i]['price'], coins[i]['link'], coins[i]['ticket'], coins[i]['percent'], coins[i]['sign'])
-            time.sleep(20)
-        print(coins)
-    else:
-        print("ERROR")
-        
-
-
-parse()
-db.close()
+                else:
+                    db.update(coins[i]['price'], coins[i]['percent'], coins[i]['sign'], coins[i]['ticket'])
+            print(coins)
+        else:
+            print("ERROR")
+        await asyncio.sleep(120)
