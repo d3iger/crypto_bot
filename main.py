@@ -67,9 +67,9 @@ async def send_everyone():
     time.sleep(60)
 
 async def sched():
+    schedule.every().day.at("01:19").do(send_everyone)
     while True:
         await schedule.run_pending()
-        schedule.every().day.at("01:15").do(send_everyone)
         await asyncio.sleep(0.1) 
 
 if __name__ == '__main__':
