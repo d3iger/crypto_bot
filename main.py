@@ -64,7 +64,6 @@ async def send_everyone():
     list_id = get_id()
     for id in list_id:
         requests.post('https://api.telegram.org/bot{}/sendMessage?chat_id={}&text={}'.format(config.API_TOKEN, str(id), str(send_list())))
-    time.sleep(60)
 
 async def sched():
     schedule.every().day.at("01:19").do(send_everyone)
